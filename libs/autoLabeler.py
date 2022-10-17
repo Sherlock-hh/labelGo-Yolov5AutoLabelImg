@@ -1,7 +1,8 @@
+
 import argparse
 import time
 from pathlib import Path
-
+import os
 import cv2
 import torch
 import torch.backends.cudnn as cudnn
@@ -15,6 +16,7 @@ from libs.detect_utils.general import check_img_size, check_requirements, check_
 from libs.detect_utils.plots import colors, plot_one_box
 from libs.detect_utils.torch_utils import select_device, load_classifier, time_sync
 
+subsampleFrame=5
 
 @torch.no_grad()
 def run(weights='yolov5s.pt',  # model.pt path(s)
@@ -32,7 +34,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         classes=None,  # filter by class: --class 0, or --class 0 2 3
         agnostic_nms=False,  # class-agnostic NMS
         augment=False,  # augmented inference
-        visualize=False,  # visualize features
+        visualize=True,  # visualize features
         update=False,  # update all models
         project='runs/detect',  # save results to project/name
         name='exp',  # save results to project/name
@@ -43,11 +45,12 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         half=False,  # use FP16 half-precision inference
         ):
     save_img = not nosave and not source.endswith('.txt')  # save inference images
+    save_img=False
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
 
     # Directories
-    save_dir = increment_path(Path(source) / name, exist_ok=exist_ok)  # increment run
+    save_dir = increment_path(Path(source) / name, exist_ok=exist_ok,mkdir=True)  # increment run
 
     # Initialize
     set_logging()
@@ -88,7 +91,11 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
     if pt and device.type != 'cpu':
         model(torch.zeros(1, 3, imgsz, imgsz).to(device).type_as(next(model.parameters())))  # run once
     t0 = time.time()
+    imgid=0
     for path, img, im0s, vid_cap in dataset:
+        imgid += 1
+        if imgid%subsampleFrame!=0:
+            continue
         if pt:
             img = torch.from_numpy(img).to(device)
             img = img.half() if half else img.float()  # uint8 to fp16/32
@@ -113,7 +120,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
         # Second-stage classifier (optional)
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
-
+        personcount = 0
         # Process predictions
         for i, det in enumerate(pred):  # detections per image
             if webcam:  # batch_size >= 1
@@ -122,8 +129,10 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                 p, s, im0, frame = path, '', im0s.copy(), getattr(dataset, 'frame', 0)
 
             p = Path(p)  # to Path
-            save_path = str(save_dir / p.name)  # img.jpg
-            txt_path = str(Path(source) / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
+
+
+            save_path = str(save_dir /p.name)  # img.jpg
+            txt_path = str(save_dir / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
             s += '%gx%g ' % img.shape[2:]  # print string
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
@@ -137,12 +146,21 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                     s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
                 # Write results
+
                 for *xyxy, conf, cls in reversed(det):
                     if save_txt:  # Write to file
                         xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                        #xyxy_list= ((torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()
                         line = (cls, *xywh, conf) if save_conf else (cls, *xywh)  # label format
+
+
+                        if (cls != 0):
+                            continue
+                        personcount+=1
                         with open(txt_path + '.txt', 'a') as f:
+
                             f.write(('%g ' * len(line)).rstrip() % line + '\n')
+
 
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
@@ -152,8 +170,11 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
                         if save_crop:
                             save_one_box(xyxy, im0s, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
 
+
             # Print time (inference + NMS)
             print(f'{s}Done. ({t2 - t1:.3f}s)')
+            if (personcount > 0):
+                cv2.imwrite(save_path, im0s, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
             # Stream results
             if view_img:
@@ -163,7 +184,7 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
             # Save results (image with detections)
             if save_img:
                 if dataset.mode == 'image':
-                    cv2.imwrite(save_path, im0)
+                    cv2.imwrite(save_path, im0, [cv2.IMWRITE_PNG_COMPRESSION, 0])
                 else:  # 'video' or 'stream'
                     if vid_path[i] != save_path:  # new video
                         vid_path[i] = save_path
@@ -185,5 +206,45 @@ def run(weights='yolov5s.pt',  # model.pt path(s)
 
     print(f'Done. ({time.time() - t0:.3f}s)')
 
+if __name__ == '__main__':
 
+        last_open_dir='D:/pngdata/unlabel'
+        weight_path='C:/Users/Administrator/Downloads/yolov5x.pt'
+        folder=os.listdir(last_open_dir)
+        for files in os.walk(last_open_dir):
+            for l in files:
+                for f in l:
+                    if ".txt" in f and f != 'classes.txt':
+                        os.remove(files[0] + '/' + f)
+        for filefolder in folder:
+
+            parser = argparse.ArgumentParser()
+            parser.add_argument('--weights', nargs='+', type=str, default=[weight_path], help='model.pt path(s)')
+            parser.add_argument('--source', type=str, default=f"{last_open_dir}/{filefolder}", help='file/dir/URL/glob, 0 for webcam')
+            parser.add_argument('--imgsz', '--img', '--img-size', type=int, default=640, help='inference size (pixels)')
+            parser.add_argument('--conf-thres', type=float, default=0.25, help='confidence threshold')
+            parser.add_argument('--iou-thres', type=float, default=0.45, help='NMS IoU threshold')
+            parser.add_argument('--max-det', type=int, default=1000, help='maximum detections per image')
+            parser.add_argument('--device', default='', help='cuda device, i.e. 0 or 0,1,2,3 or cpu')
+            parser.add_argument('--view-img', action='store_true', help='show results')
+            parser.add_argument('--save-txt', action='store_true', help='save results to *.txt', default='true')
+            parser.add_argument('--save-conf', action='store_true', help='save confidences in --save-txt labels')
+            parser.add_argument('--save-crop', action='store_true', help='save cropped prediction boxes')
+            parser.add_argument('--nosave', action='store_true', help='do not save images/videos')
+            parser.add_argument('--classes', nargs='+', type=int, help='filter by class: --class 0, or --class 0 2 3')
+            parser.add_argument('--agnostic-nms', action='store_true', help='class-agnostic NMS')
+            parser.add_argument('--augment', action='store_true', help='augmented inference')
+            parser.add_argument('--visualize', action='store_true', help='visualize features')
+            parser.add_argument('--update', action='store_true', help='update all models')
+            parser.add_argument('--project', default='runs/detect', help='save results to project/name')
+            parser.add_argument('--name', default='exp', help='save results to project/name')
+            parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
+            parser.add_argument('--line-thickness', default=3, type=int, help='bounding box thickness (pixels)')
+            parser.add_argument('--hide-labels', default=False, action='store_true', help='hide labels')
+            parser.add_argument('--hide-conf', default=False, action='store_true', help='hide confidences')
+            parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
+            opt = parser.parse_args()
+
+
+            run(**vars(opt))
 

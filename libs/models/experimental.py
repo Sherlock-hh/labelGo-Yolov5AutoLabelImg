@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from libs.models.common import Conv, DWConv
 from libs.detect_utils.downloads import attempt_download
-
+from libs.models.yolo import Detect, Model
 
 class CrossConv(nn.Module):
     # Cross Convolution Downsample
@@ -111,7 +111,7 @@ class Ensemble(nn.ModuleList):
 
 
 def attempt_load(weights, map_location=None, inplace=True):
-    from libs.models.yolo import Detect, Model
+
 
     # Loads an ensemble of models weights=[a,b,c] or a single model weights=[a] or weights=a
     model = Ensemble()

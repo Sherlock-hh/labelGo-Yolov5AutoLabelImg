@@ -269,7 +269,7 @@ class MainWindow(QMainWindow, WindowMixin):
 
         close = action(get_str('closeCur'), self.close_file, 'Ctrl+W', 'close', get_str('closeCurDetail'))
 
-        delete_image = action(get_str('deleteImg'), self.delete_image, 'Ctrl+Shift+D', 'close', get_str('deleteImgDetail'))
+        delete_image = action(get_str('deleteImg'), self.delete_image, 'b', 'close', get_str('deleteImgDetail'))
 
         reset_all = action(get_str('resetAll'), self.reset_all, None, 'resetall', get_str('resetAllDetail'))
 
@@ -284,7 +284,7 @@ class MainWindow(QMainWindow, WindowMixin):
         create = action(get_str('crtBox'), self.create_shape,
                         'w', 'new', get_str('crtBoxDetail'), enabled=False)
         delete = action(get_str('delBox'), self.delete_selected_shape,
-                        'Delete', 'delete', get_str('delBoxDetail'), enabled=False)
+                        'q', 'delete', get_str('delBoxDetail'), enabled=False)
         copy = action(get_str('dupBox'), self.copy_selected_shape,
                       'Ctrl+D', 'copy', get_str('dupBoxDetail'),
                       enabled=False)
@@ -1356,7 +1356,8 @@ class MainWindow(QMainWindow, WindowMixin):
                 for list in files:
                         for f in list:
                             if ".txt" in f and f != 'classes.txt':
-                                os.remove(self.last_open_dir+'/'+f)
+
+                                os.remove(files[0]+'/'+f)
             parser = argparse.ArgumentParser()
             parser.add_argument('--weights', nargs='+', type=str, default=weight_path[0], help='model.pt path(s)')
             parser.add_argument('--source', type=str, default=self.last_open_dir, help='file/dir/URL/glob, 0 for webcam')
@@ -1452,7 +1453,7 @@ class MainWindow(QMainWindow, WindowMixin):
                 self.load_file(filename)
 
     def open_next_image(self, _value=False):
-        # Proceeding prev image without dialog if having any label
+        #         # Proceeding prev image without dialog if having any label
         if self.auto_saving.isChecked():
             if self.default_save_dir is not None:
                 if self.dirty is True:
@@ -1505,8 +1506,9 @@ class MainWindow(QMainWindow, WindowMixin):
             image_file_name = os.path.basename(self.file_path)
             saved_file_name = os.path.splitext(image_file_name)[0]
             saved_path = os.path.join(image_file_dir, saved_file_name)
-            self._save_file(saved_path if self.label_file
-                            else self.save_file_dialog(remove_ext=False))
+            # self._save_file(saved_path if self.label_file
+            #                 else self.save_file_dialog(remove_ext=False))
+            self._save_file(saved_path)
 
     def save_file_as(self, _value=False):
         assert not self.image.isNull(), "cannot save empty image"
@@ -1565,14 +1567,16 @@ class MainWindow(QMainWindow, WindowMixin):
         if not self.dirty:
             return True
         else:
-            discard_changes = self.discard_changes_dialog()
-            if discard_changes == QMessageBox.No:
-                return True
-            elif discard_changes == QMessageBox.Yes:
-                self.save_file()
-                return True
-            else:
-                return False
+            self.save_file()
+            return True
+            # discard_changes = self.discard_changes_dialog()
+            # if discard_changes == QMessageBox.No:
+            #     return True
+            # elif discard_changes == QMessageBox.Yes:
+            #     self.save_file()
+            #     return True
+            # else:
+            #     return False
 
     def discard_changes_dialog(self):
         yes, no, cancel = QMessageBox.Yes, QMessageBox.No, QMessageBox.Cancel
